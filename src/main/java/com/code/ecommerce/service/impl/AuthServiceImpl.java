@@ -6,17 +6,26 @@ import com.code.ecommerce.dto.request.RegisterRequest;
 import com.code.ecommerce.dto.response.AuthDto;
 import com.code.ecommerce.entity.Role;
 import com.code.ecommerce.entity.User;
+import com.code.ecommerce.entity.VerificationToken;
+import com.code.ecommerce.exceptions.APIException;
 import com.code.ecommerce.exceptions.UserAlreadyExistException;
+import com.code.ecommerce.exceptions.UserNotActivatedException;
 import com.code.ecommerce.mapper.AddressMapper;
 import com.code.ecommerce.mapper.UserMapper;
 import com.code.ecommerce.repository.AddressRepository;
 import com.code.ecommerce.repository.UserRepository;
+import com.code.ecommerce.repository.VerificationTokenRepository;
 import com.code.ecommerce.security.jwt.JwtService;
 import com.code.ecommerce.service.AuthService;
 import com.code.ecommerce.service.UserService;
+import com.code.ecommerce.service.VerificationService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import java.io.IOException;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -27,11 +36,6 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.io.IOException;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Optional;
-
 @Service
 @Slf4j
 @RequiredArgsConstructor
@@ -41,8 +45,8 @@ public class AuthServiceImpl implements AuthService {
     String secretPsw;
 
     private final UserRepository userRepository;
-    private final AddressRepository addressRepository;
-    private final AddressMapper addressMapper;
+    private final VerificationTokenRepository verificationTokenRepository;
+    private final VerificationService verificationService;
     private final UserMapper userMapper;
     private final AuthenticationManager authenticationManager;
     private final JwtService jwtService;
@@ -67,6 +71,10 @@ public class AuthServiceImpl implements AuthService {
         String accessToken = jwtService.generateAccessToken(userDetail, extraClaims);
         String refreshToken = jwtService.generateRefreshToken(userDetail);
 
+        if (userDetail.getLocked().equals(true)){
+            throw new APIException("User is blocked");
+        }
+
         //        if (userDetail.getEnabled()) {
         //            throw new APIException("User is not enable!!");
         //        }
@@ -88,10 +96,18 @@ public class AuthServiceImpl implements AuthService {
         User savedUser;
         Optional<User> currentUser = userRepository.findByEmail(registerRequest.getEmail());
         if (currentUser.isPresent()) {
-            log.error("*** String, service; register user already exists *");
-            throw new UserAlreadyExistException("user already exists");
-        }
+            User existedUser = currentUser.get();
+            if (!existedUser.isEnabled()) {
+                throw new UserNotActivatedException(
+                    "User with email " + registerRequest
+                        .getEmail() + " has been registered but not activated. Please check your email.");
+            } else {
+                log.error("*** String, service; register user already exists *");
+                throw new UserAlreadyExistException("user already exists");
+            }
 
+
+        }
 
         User user = userMapper.reqToEntity(registerRequest);
         user.setRole(Role.USER);
@@ -99,6 +115,9 @@ public class AuthServiceImpl implements AuthService {
         user.setLocked(true);
         user.setPassword(passwordEncoder.encode(registerRequest.getPassword()));
         savedUser = userRepository.save(user);
+
+        //Save the verification token for the user
+        VerificationToken verificationToken = verificationService.saveUserVerificationToken(savedUser);
 
 
         return savedUser.getId();

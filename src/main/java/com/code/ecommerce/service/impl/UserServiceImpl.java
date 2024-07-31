@@ -37,116 +37,128 @@ import java.util.Map;
 public class UserServiceImpl implements UserService {
 
 
-    @Value("${secretPsw}")
-    String secretPsw;
+  @Value("${secretPsw}")
+  String secretPsw;
 
-    private final UserRepository userRepository;
-    private final UserMapper userMapper;
-    private final PasswordEncoder passwordEncoder;
-    private final CloudinaryService cloudinaryService;
+  private final UserRepository userRepository;
+  private final UserMapper userMapper;
+  private final PasswordEncoder passwordEncoder;
+  private final CloudinaryService cloudinaryService;
 
-    @Override
-    public User createUser(UserRequest userRequest) {
-        User user = userMapper.reqUserToEntity(userRequest);
-        user.setRole(Role.USER);
-        user.setEnabled(Boolean.TRUE);
-        user.setPassword(passwordEncoder.encode(secretPsw));
-        return userRepository.save(user);
+  @Override
+  public User createUser(UserRequest userRequest) {
+    User user = userMapper.reqUserToEntity(userRequest);
+    user.setRole(Role.USER);
+    user.setEnabled(Boolean.TRUE);
+    user.setPassword(passwordEncoder.encode(secretPsw));
+    return userRepository.save(user);
+  }
+
+  @Override
+  public UserDto getCurrentUser(String token) {
+    Claims claims = JwtUtils.parseClaims(JwtUtils.getTokenFromBearer(token));
+    String userId = (String) claims.get("userId");
+    if (userId.isEmpty()) {
+      throw new MissingInputException("require userId to get current user");
+    }
+    return userMapper.toDto(userRepository.findById(userId)
+        .orElseThrow(() -> new NotFoundException("Can't find user with id" + userId)));
+  }
+
+  @Override
+  public List<UserDto> getAllUser() {
+    return userMapper.toDto(userRepository.findAll());
+  }
+
+  @Override
+  public PagingData getUsers(String searchText, Integer offset, Integer pageSize, String sortStr) {
+    Page<User> userPageEntities;
+    Sort sort = PaginationUtils.buildSort(sortStr);
+    Pageable pageable = PageRequest.of(offset, pageSize, sort);
+
+    if (searchText.isEmpty()) {
+      userPageEntities = userRepository.findAll(pageable);
+    } else {
+      userPageEntities = userRepository.findByEmailContainingIgnoreCase(searchText, pageable);
     }
 
-    @Override
-    public UserDto getCurrentUser(String token) {
-        Claims claims = JwtUtils.parseClaims(JwtUtils.getTokenFromBearer(token));
-        String userId = (String) claims.get("userId");
-        if (userId.isEmpty()) {
-            throw new MissingInputException("require userId to get current user");
-        }
-        return userMapper.toDto(userRepository.findById(userId)
-                .orElseThrow(() -> new NotFoundException("Can't find user with id" + userId)));
+    Page<UserDto> userPageDto = userPageEntities.map(userMapper::toDto);
+
+    return PagingData.builder()
+        .data(userPageDto)
+        .searchText(searchText)
+        .offset(offset)
+        .pageSize(pageSize)
+        .sort(sortStr)
+        .totalRecord(userPageDto.getTotalElements())
+        .build();
+  }
+
+  @Override
+  public String updateAvatar(MultipartFile file, String id) {
+    User currentUser = userRepository.findById(id)
+        .orElseThrow(() -> new NotFoundException("Can't find user with id" + id));
+
+    if (StringUtils.isNotEmpty(currentUser.getAvatarUrl())) {
+      cloudinaryService.deleteFile(currentUser.getPublicId());
     }
 
-    @Override
-    public List<UserDto> getAllUser() {
-        return userMapper.toDto(userRepository.findAll());
-    }
+    Map result = cloudinaryService.uploadFile(file);
+    String avatarUrl = (String) result.get("secure_url");
+    String publicId = (String) result.get("public_id");
 
-    @Override
-    public PagingData getUsers(String searchText, Integer offset, Integer pageSize, String sortStr) {
-        Page<User> userPageEntities;
-        Sort sort = PaginationUtils.buildSort(sortStr);
-        Pageable pageable = PageRequest.of(offset, pageSize, sort);
+    currentUser.setAvatarUrl(avatarUrl);
+    currentUser.setPublicId(publicId);
 
-        if (searchText.isEmpty()) {
-            userPageEntities = userRepository.findAll(pageable);
-        } else {
-            userPageEntities = userRepository.findByEmailContainingIgnoreCase(searchText, pageable);
-        }
+    userRepository.save(currentUser);
 
-        Page<UserDto> userPageDto = userPageEntities.map(userMapper::toDto);
+    return currentUser.getAvatarUrl();
+  }
 
-        return PagingData.builder()
-                .data(userPageDto)
-                .searchText(searchText)
-                .offset(offset)
-                .pageSize(pageSize)
-                .sort(sortStr)
-                .totalRecord(userPageDto.getTotalElements())
-                .build();
-    }
+  @Override
+  public UserDto getUserById(String id) {
+    return userMapper.toDto(
+        userRepository.findById(id)
+            .orElseThrow(() -> new NotFoundException("Can't find user with id" + id)));
+  }
 
-    @Override
-    public String updateAvatar(MultipartFile file, String id) {
-        User currentUser = userRepository.findById(id)
-                .orElseThrow(() -> new NotFoundException("Can't find user with id" + id));
+  @Override
+  public UserDto updateUser(Map<String, Object> fields, String id) {
+    User existingUser = userRepository.findById(id).orElseThrow(
+        () -> new NotFoundException("Can't find user with id" + id));
 
-        if (StringUtils.isNotEmpty(currentUser.getAvatarUrl())) {
-            cloudinaryService.deleteFile(currentUser.getPublicId());
-        }
+    fields.forEach((key, value) -> {
+      // Tìm tên của trường dựa vào "key"
+      Field field = ReflectionUtils.findField(User.class, key);
+      if (field == null) {
+        throw new NullPointerException("Can't find any field");
+      }
+      // Set quyền truy cập vào biến kể cả nó là private
+      field.setAccessible(true);
+      // đặt giá trị cho một field cụ thể trong một đối tượng dựa trên tên của field đó
+      ReflectionUtils.setField(field, existingUser, value);
+    });
+    userRepository.save(existingUser);
+    return userMapper.toDto(existingUser);
+  }
 
-        Map result = cloudinaryService.uploadFile(file);
-        String avatarUrl = (String) result.get("secure_url");
-        String publicId = (String) result.get("public_id");
+  @Override
+  public String deleteUser(String id) {
+    userRepository.deleteById(id);
+    return id;
+  }
 
-        currentUser.setAvatarUrl(avatarUrl);
-        currentUser.setPublicId(publicId);
+  @Override
+  public String blockUser(String id) {
 
-        userRepository.save(currentUser);
+    User currentUser = userRepository.findById(id)
+        .orElseThrow(() -> new NotFoundException("Can't find user with id" + id));
 
-        return currentUser.getAvatarUrl();
-    }
-
-    @Override
-    public UserDto getUserById(String id) {
-        return userMapper.toDto(
-                userRepository.findById(id).orElseThrow(() -> new NotFoundException("Can't find user with id" + id)));
-    }
-
-    @Override
-    public UserDto updateUser(Map<String, Object> fields, String id) {
-        User existingUser = userRepository.findById(id).orElseThrow(
-                () -> new NotFoundException("Can't find user with id" + id));
-
-        fields.forEach((key, value) -> {
-            // Tìm tên của trường dựa vào "key"
-            Field field = ReflectionUtils.findField(User.class, key);
-            if (field == null) {
-                throw new NullPointerException("Can't find any field");
-            }
-            // Set quyền truy cập vào biến kể cả nó là private
-            field.setAccessible(true);
-            // đặt giá trị cho một field cụ thể trong một đối tượng dựa trên tên của field đó
-            ReflectionUtils.setField(field, existingUser, value);
-        });
-        userRepository.save(existingUser);
-        return userMapper.toDto(existingUser);
-    }
-
-    @Override
-    public String deleteUser(String id) {
-        userRepository.deleteById(id);
-        return id;
-    }
-
+    currentUser.setEnabled(false);
+    currentUser.setLocked(true);
+    userRepository.save(currentUser);
+    return id;
+  }
 
 
 }

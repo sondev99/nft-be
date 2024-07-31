@@ -27,4 +27,5 @@ public interface UserService {
     String deleteUser(String id);
 
 
+  String blockUser(String id);
 }

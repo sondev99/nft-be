@@ -58,7 +58,7 @@ public class User extends BaseEntity implements UserDetails {
     @Enumerated(EnumType.STRING)
     private Role role;
 
-    private Boolean locked;
+    private Boolean locked = false;
 
     private Boolean enabled;
 
