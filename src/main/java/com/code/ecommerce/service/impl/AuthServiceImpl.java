@@ -1,6 +1,8 @@
 package com.code.ecommerce.service.impl;
 
 import com.code.ecommerce.constance.ResponseStatus;
+import com.code.ecommerce.dto.MailEvent;
+import com.code.ecommerce.dto.UserInfo;
 import com.code.ecommerce.dto.request.LoginRequest;
 import com.code.ecommerce.dto.request.RegisterRequest;
 import com.code.ecommerce.dto.response.AuthDto;
@@ -17,6 +19,7 @@ import com.code.ecommerce.repository.UserRepository;
 import com.code.ecommerce.repository.VerificationTokenRepository;
 import com.code.ecommerce.security.jwt.JwtService;
 import com.code.ecommerce.service.AuthService;
+import com.code.ecommerce.service.MailService;
 import com.code.ecommerce.service.UserService;
 import com.code.ecommerce.service.VerificationService;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -41,112 +44,123 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class AuthServiceImpl implements AuthService {
 
-    @Value("${secretPsw}")
-    String secretPsw;
+  @Value("${secretPsw}")
+  String secretPsw;
 
-    private final UserRepository userRepository;
-    private final VerificationTokenRepository verificationTokenRepository;
-    private final VerificationService verificationService;
-    private final UserMapper userMapper;
-    private final AuthenticationManager authenticationManager;
-    private final JwtService jwtService;
-    private final UserService userService;
-    private final PasswordEncoder passwordEncoder;
+  private final UserRepository userRepository;
+  private final VerificationTokenRepository verificationTokenRepository;
+  private final VerificationService verificationService;
+  private final UserMapper userMapper;
+  private final AuthenticationManager authenticationManager;
+  private final JwtService jwtService;
+  private final PasswordEncoder passwordEncoder;
+  private final MailService mailService;
 
-    @Override
-    public AuthDto login(LoginRequest loginRequest) {
-        Authentication authentication = authenticationManager.authenticate(
-                new UsernamePasswordAuthenticationToken(
-                        loginRequest.getEmail(),
-                        loginRequest.getPassword()
-                )
-        );
+  @Override
+  public AuthDto login(LoginRequest loginRequest) {
+    Authentication authentication = authenticationManager.authenticate(
+        new UsernamePasswordAuthenticationToken(
+            loginRequest.getEmail(),
+            loginRequest.getPassword()
+        )
+    );
 
-        User userDetail = (User) authentication.getPrincipal();
+    User userDetail = (User) authentication.getPrincipal();
 
-        Map<String, Object> extraClaims = new HashMap<>();
-        extraClaims.put("roles", userDetail.getRole());
-        extraClaims.put("userId", userDetail.getId());
+    Map<String, Object> extraClaims = new HashMap<>();
+    extraClaims.put("roles", userDetail.getRole());
+    extraClaims.put("userId", userDetail.getId());
 
-        String accessToken = jwtService.generateAccessToken(userDetail, extraClaims);
-        String refreshToken = jwtService.generateRefreshToken(userDetail);
+    String accessToken = jwtService.generateAccessToken(userDetail, extraClaims);
+    String refreshToken = jwtService.generateRefreshToken(userDetail);
 
-        if (userDetail.getLocked().equals(true)){
-            throw new APIException("User is blocked");
-        }
+    if (userDetail.getLocked().equals(true)) {
+      throw new APIException("User is blocked");
+    }
 
-        //        if (userDetail.getEnabled()) {
-        //            throw new APIException("User is not enable!!");
-        //        }
-        return AuthDto.builder()
-                .accessToken(accessToken)
-                .refreshToken(refreshToken)
-                .status(String.valueOf(ResponseStatus.OK))
-                .fullName(userDetail.getFirstName() + " " + userDetail.getLastName())
-                .type("Bearer")
-                .userId(userDetail.getId())
-                .role(userDetail.getRole())
-                .build();
+    //        if (userDetail.getEnabled()) {
+    //            throw new APIException("User is not enable!!");
+    //        }
+    return AuthDto.builder()
+        .accessToken(accessToken)
+        .refreshToken(refreshToken)
+        .status(String.valueOf(ResponseStatus.OK))
+        .fullName(userDetail.getFirstName() + " " + userDetail.getLastName())
+        .type("Bearer")
+        .userId(userDetail.getId())
+        .role(userDetail.getRole())
+        .build();
+
+  }
+
+  @Override
+  @Transactional
+  public String register(RegisterRequest registerRequest) {
+    User savedUser;
+    Optional<User> currentUser = userRepository.findByEmail(registerRequest.getEmail());
+    if (currentUser.isPresent()) {
+      User existedUser = currentUser.get();
+      if (!existedUser.isEnabled()) {
+        throw new UserNotActivatedException(
+            "User with email " + registerRequest
+                .getEmail() + " has been registered but not activated. Please check your email.");
+      } else {
+        log.error("*** String, service; register user already exists *");
+        throw new UserAlreadyExistException("user already exists");
+      }
+
 
     }
 
-    @Override
-    @Transactional
-    public String register(RegisterRequest registerRequest) {
-        User savedUser;
-        Optional<User> currentUser = userRepository.findByEmail(registerRequest.getEmail());
-        if (currentUser.isPresent()) {
-            User existedUser = currentUser.get();
-            if (!existedUser.isEnabled()) {
-                throw new UserNotActivatedException(
-                    "User with email " + registerRequest
-                        .getEmail() + " has been registered but not activated. Please check your email.");
-            } else {
-                log.error("*** String, service; register user already exists *");
-                throw new UserAlreadyExistException("user already exists");
-            }
+    User user = userMapper.reqToEntity(registerRequest);
+    user.setRole(Role.USER);
+    user.setEnabled(true);
+    user.setLocked(true);
+    user.setPassword(passwordEncoder.encode(registerRequest.getPassword()));
+    savedUser = userRepository.save(user);
 
+    //Save the verification token for the user
+    VerificationToken verificationToken = verificationService.saveUserVerificationToken(savedUser);
 
+    mailService.sendVerificationEmail(MailEvent.builder()
+        .userInfo(UserInfo.builder()
+            .id(savedUser.getId())
+            .firstName(savedUser.getFirstName())
+            .lastName(savedUser.getLastName())
+            .email(savedUser.getEmail())
+            .phone(savedUser.getPhone())
+            .build())
+        .verificationToken(verificationToken.getToken())
+        .build());
+
+    return savedUser.getId();
+  }
+
+  @Override
+  public void refreshToken(HttpServletRequest request, HttpServletResponse response)
+      throws IOException {
+    String token = jwtService.getTokenFromRequest(request);
+    if (token != null && jwtService.validateToken(token)) {
+      String email = jwtService.getEmailFromToken(token);
+      if (email != null) {
+        User user = userRepository.findByEmail(email).orElseThrow();
+        if (jwtService.validateToken(token)) {
+          Map<String, Object> extraClaims = new HashMap<>();
+          extraClaims.put("roles", user.getRole());
+          extraClaims.put("userId", user.getId());
+          String accessToken = jwtService.generateAccessToken(user, extraClaims);
+          AuthDto authDto = AuthDto.builder()
+              .accessToken(accessToken)
+              .refreshToken(token)
+              .status(String.valueOf(ResponseStatus.OK))
+              .fullName(user.getFirstName() + " " + user.getLastName())
+              .type("Bearer")
+              .role(user.getRole())
+              .build();
+          new ObjectMapper().writeValue(response.getOutputStream(), authDto);
         }
-
-        User user = userMapper.reqToEntity(registerRequest);
-        user.setRole(Role.USER);
-        user.setEnabled(true);
-        user.setLocked(true);
-        user.setPassword(passwordEncoder.encode(registerRequest.getPassword()));
-        savedUser = userRepository.save(user);
-
-        //Save the verification token for the user
-        VerificationToken verificationToken = verificationService.saveUserVerificationToken(savedUser);
-
-
-        return savedUser.getId();
+      }
     }
-
-    @Override
-    public void refreshToken(HttpServletRequest request, HttpServletResponse response) throws IOException {
-        String token = jwtService.getTokenFromRequest(request);
-        if (token != null && jwtService.validateToken(token)) {
-            String email = jwtService.getEmailFromToken(token);
-            if (email != null) {
-                User user = userRepository.findByEmail(email).orElseThrow();
-                if (jwtService.validateToken(token)) {
-                    Map<String, Object> extraClaims = new HashMap<>();
-                    extraClaims.put("roles", user.getRole());
-                    extraClaims.put("userId", user.getId());
-                    String accessToken = jwtService.generateAccessToken(user, extraClaims);
-                    AuthDto authDto = AuthDto.builder()
-                            .accessToken(accessToken)
-                            .refreshToken(token)
-                            .status(String.valueOf(ResponseStatus.OK))
-                            .fullName(user.getFirstName() + " " + user.getLastName())
-                            .type("Bearer")
-                            .role(user.getRole())
-                            .build();
-                    new ObjectMapper().writeValue(response.getOutputStream(), authDto);
-                }
-            }
-        }
-    }
+  }
 
 }

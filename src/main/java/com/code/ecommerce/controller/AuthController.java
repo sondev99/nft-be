@@ -52,9 +52,9 @@ public class AuthController {
         authService.refreshToken(request, response);
     }
 
-    @GetMapping("/send-mail")
-    public String sendMail(@RequestParam(name = "objectName") String objectName) {
-        mailService.sendVerificationEmail(objectName);
-        return "Email sent successfully";
-    }
+//    @GetMapping("/send-mail")
+//    public String sendMail(@RequestParam(name = "objectName") String objectName) {
+//        mailService.sendVerificationEmail(objectName);
+//        return "Email sent successfully";
+//    }
 }

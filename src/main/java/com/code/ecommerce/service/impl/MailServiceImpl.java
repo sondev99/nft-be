@@ -2,9 +2,13 @@ package com.code.ecommerce.service.impl;
 
 import com.amazonaws.services.s3.AmazonS3;
 import com.amazonaws.services.s3.model.S3Object;
+import com.code.ecommerce.dto.MailEvent;
+import com.code.ecommerce.exceptions.APIException;
 import com.code.ecommerce.service.MailService;
 import jakarta.mail.MessagingException;
 import jakarta.mail.internet.MimeMessage;
+import java.util.Locale;
+import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -16,6 +20,7 @@ import org.springframework.stereotype.Service;
 import org.thymeleaf.TemplateEngine;
 
 import java.io.UnsupportedEncodingException;
+import org.thymeleaf.context.Context;
 
 @Service
 @RequiredArgsConstructor
@@ -24,62 +29,42 @@ public class MailServiceImpl implements MailService {
     @Value("${spring.mail.username}")
     private String from;
 
-//    @Value("${client.baseUrl}")
-//    private String clientUrl;
-
-//    @Value("${cloud.aws.bucket.name}")
-//    private String bucketName;
-//
-//    @Value("${cloud.aws.region.static}")
-//    private String region;
-//
-//    @Value("${cloud.aws.path}")
-//    private String path;
+    @Value("${client.baseUrl}")
+    private String clientUrl;
 
 
     private final JavaMailSender mailSender;
 
     private final TemplateEngine templateEngine;
 
-//    private final AmazonS3 s3Client;
 
 
     @Override
-    public void sendVerificationEmail(String objectName) {
+    public void sendVerificationEmail(MailEvent mailEvent) {
         String subject = "Email Verification";
         String senderName = "SG Shop";
 
         MimeMessage message = mailSender.createMimeMessage();
-//        log.info("Got message <{}>", mailEvent.getUserInfo().getId());
+        log.info("Got message <{}>", mailEvent.getUserInfo().getId());
 
-//        String url = String.format("%s/verification/%s", clientUrl, mailEvent.getVerificationToken());
+        String url = String.format("%s/verification/%s", clientUrl, mailEvent.getVerificationToken());
 
-//        log.info("Got url <{}>", url);
-//        S3Object s3Object = s3Client.getObject("ncp-storage", "1714026981818_toyota-corola.jpg");
-//        Resource resource = new InputStreamResource(s3Object.getObjectContent());
-
+        log.info("Got url <{}>", url);
 
         try {
             var messageHelper = new MimeMessageHelper(message, true, "UTF-8");
 
             messageHelper.setFrom(from, senderName);
-            messageHelper.setTo("sondev2205@gmail.com");
+            messageHelper.setTo(mailEvent.getUserInfo().getEmail());
             messageHelper.setSubject(subject);
-            messageHelper.setText("abcd");
+            Map<String, Object> context = Map.of("username", mailEvent.getUserInfo().getFirstName() + mailEvent.getUserInfo().getLastName(), "verificationLink", url);
 
-
-//            messageHelper.addAttachment("Invoice", resource);
-//            messageHelper.setSubject(subject);
-//            Map<String, Object> context = Map.of("username", "Son" + "Tran", "verificationLink", "https://vticloud.io/amazon-ses-la-gi-huong-dan-tong-hop-ve-dich-vu-amazon-ses/");
-//
-//            String mailContent = templateEngine.process(
-//                    "verification_template", new Context(Locale.getDefault(), context));
-//            messageHelper.setText(mailContent, true);
-
-
+            String mailContent = templateEngine.process(
+                "verification_template", new Context(Locale.getDefault(), context));
+            messageHelper.setText(mailContent, true);
         } catch (MessagingException | UnsupportedEncodingException e) {
             log.error(e.getMessage());
-            throw new RuntimeException(e.getMessage());
+            throw new APIException(e.getMessage());
         }
 
         mailSender.send(message);
