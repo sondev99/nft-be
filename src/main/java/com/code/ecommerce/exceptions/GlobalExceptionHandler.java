@@ -42,7 +42,8 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
                 webRequest.getDescription(false),
                 HttpStatus.INTERNAL_SERVER_ERROR,
                 exception.getMessage(),
-                LocalDateTime.now()
+                LocalDateTime.now(),
+                400
         );
         return new ResponseEntity<>(errorResponseDTO, HttpStatus.INTERNAL_SERVER_ERROR);
     }
@@ -53,7 +54,8 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
                 webRequest.getDescription(false),
                 HttpStatus.BAD_REQUEST,
                 exception.getMessage(),
-                LocalDateTime.now()
+                LocalDateTime.now(),
+                400
         );
         return new ResponseEntity<>(errorResponseDTO, HttpStatus.BAD_REQUEST);
     }
@@ -65,7 +67,8 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
                 webRequest.getDescription(false),
                 HttpStatus.NOT_FOUND,
                 exception.getMessage(),
-                LocalDateTime.now()
+                LocalDateTime.now(),
+                404
         );
         return new ResponseEntity<>(errorResponseDTO, HttpStatus.NOT_FOUND);
     }
@@ -77,7 +80,8 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
                 webRequest.getDescription(false),
                 HttpStatus.BAD_REQUEST,
                 exception.getMessage(),
-                LocalDateTime.now()
+                LocalDateTime.now(),
+                400
         );
         return new ResponseEntity<>(errorResponseDTO, HttpStatus.BAD_REQUEST);
     }

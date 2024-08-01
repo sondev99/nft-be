@@ -12,4 +12,5 @@ public class SummaryResponse {
     private BigDecimal totalTradingVolume;
     private Long totalUser;
     private Long totalTransaction;
+    private Long totalNft;
 }

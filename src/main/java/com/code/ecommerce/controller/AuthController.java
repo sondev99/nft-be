@@ -52,6 +52,11 @@ public class AuthController {
         authService.refreshToken(request, response);
     }
 
+    @PostMapping("/active-user/{token}")
+    public ResponseEntity<ResponseMessage> activeUser(@PathVariable String token) {
+        return ResponseEntity.status(HttpStatus.OK).body(ResponseMessage.<String>builder().code(200).message(authService.activeUser(token)).build());
+    }
+
 //    @GetMapping("/send-mail")
 //    public String sendMail(@RequestParam(name = "objectName") String objectName) {
 //        mailService.sendVerificationEmail(objectName);

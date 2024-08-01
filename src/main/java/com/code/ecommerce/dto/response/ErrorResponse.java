@@ -20,4 +20,6 @@ public class ErrorResponse implements Serializable {
 
     private LocalDateTime errorTime;
 
+    private int code;
+
 }

@@ -1,7 +1,6 @@
 package com.code.ecommerce.service;
 
 
-
 import com.code.ecommerce.dto.request.LoginRequest;
 import com.code.ecommerce.dto.request.RegisterRequest;
 import com.code.ecommerce.dto.response.AuthDto;
@@ -18,5 +17,6 @@ public interface AuthService {
 
     void refreshToken(HttpServletRequest request, HttpServletResponse response) throws IOException;
 
+    String activeUser(String token);
 
 }

@@ -39,7 +39,6 @@ public class AuthEntryPoint implements AuthenticationEntryPoint {
 
         ErrorResponse re =  ErrorResponse.builder()
                 .errorCode(HttpStatus.BAD_REQUEST)
-                .errorTime(LocalDateTime.now())
                 .errorMessage(authException.getMessage())
                 .build();
         response.setContentType(MediaType.APPLICATION_JSON_VALUE);

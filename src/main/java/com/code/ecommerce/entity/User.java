@@ -41,9 +41,8 @@ public class User extends BaseEntity implements UserDetails {
     @Email(message = "*Input must be in Email format!**")
     private String email;
 
-//    @JsonIgnore
-//    @OneToMany(mappedBy = "user", fetch = FetchType.LAZY, cascade = CascadeType.ALL)
-//    private List<Transaction> transactions;
+    @OneToMany(mappedBy = "user", fetch = FetchType.LAZY, cascade = CascadeType.ALL)
+    private List<Transaction> transactions;
 
     private String walletAddress;
 

@@ -10,6 +10,7 @@ import com.code.ecommerce.entity.Role;
 import com.code.ecommerce.entity.User;
 import com.code.ecommerce.entity.VerificationToken;
 import com.code.ecommerce.exceptions.APIException;
+import com.code.ecommerce.exceptions.NotFoundException;
 import com.code.ecommerce.exceptions.UserAlreadyExistException;
 import com.code.ecommerce.exceptions.UserNotActivatedException;
 import com.code.ecommerce.mapper.AddressMapper;
@@ -78,9 +79,9 @@ public class AuthServiceImpl implements AuthService {
       throw new APIException("User is blocked");
     }
 
-    //        if (userDetail.getEnabled()) {
-    //            throw new APIException("User is not enable!!");
-    //        }
+    if (!userDetail.getEnabled()) {
+      throw new APIException("User is not enable!!");
+    }
     return AuthDto.builder()
         .accessToken(accessToken)
         .refreshToken(refreshToken)
@@ -114,8 +115,8 @@ public class AuthServiceImpl implements AuthService {
 
     User user = userMapper.reqToEntity(registerRequest);
     user.setRole(Role.USER);
-    user.setEnabled(true);
-    user.setLocked(true);
+    user.setEnabled(false);
+    user.setLocked(false);
     user.setPassword(passwordEncoder.encode(registerRequest.getPassword()));
     savedUser = userRepository.save(user);
 
@@ -161,6 +162,15 @@ public class AuthServiceImpl implements AuthService {
         }
       }
     }
+  }
+
+  @Override
+  public String activeUser(String token) {
+    VerificationToken verificationToken = verificationTokenRepository.findByToken(token).orElseThrow(() -> new NotFoundException("Can't find Token " + token));
+    User currentUser = userRepository.findById(verificationToken.getUserId()).orElseThrow(() -> new NotFoundException("Can't find user with id " + verificationToken.getUserId()));
+    currentUser.setEnabled(true);
+
+    return userRepository.save(currentUser).getId();
   }
 
 }
