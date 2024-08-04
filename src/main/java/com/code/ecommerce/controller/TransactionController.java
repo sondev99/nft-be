@@ -12,6 +12,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
+
 @RequestMapping("/transactions")
 @RestController
 @Slf4j
@@ -38,4 +40,15 @@ public class TransactionController {
 
 
     }
+
+    @GetMapping
+    @PreAuthorize("hasAuthority('ADMIN')")
+    public ResponseEntity<ResponseMessage> getAllTransaction() {
+        return ResponseEntity
+                .status(HttpStatus.OK)
+                .body(ResponseMessage.<List<TransactionDto>>builder().code(200).message("Get all transaction successfully !!!").data(transactionService.getAllTransaction()).build());
+
+
+    }
+
 }

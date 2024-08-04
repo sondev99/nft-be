@@ -29,4 +29,8 @@ public class UserDto {
 
     private Address address;
 
+    private Boolean locked;
+
+    private Boolean enabled;
+
 }
