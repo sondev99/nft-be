@@ -16,6 +16,7 @@ import org.springframework.stereotype.Service;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 
 @Service
@@ -28,7 +29,7 @@ public class TransactionServiceImpl implements TransactionService {
     @Override
     public TransactionDto saveTransaction(TransactionRequest transactionRequest, String id) {
         Transaction transactionEntity = transactionRepository.findById(id).map(transaction -> {
-            transaction.setTransactionDate(transactionRequest.getTransactionDate());
+            transaction.setTransactionDate(LocalDate.now());
 //            transaction.setUser(userRepository.findById(transactionRequest.getUserId()).orElseThrow(() -> new NotFoundException("User not found")));
             transaction.setPrice(transactionRequest.getPrice());
             transaction.setQuantity(transactionRequest.getQuantity());
@@ -41,9 +42,15 @@ public class TransactionServiceImpl implements TransactionService {
 
     @Override
     public List<TransactionDto> getAllTransaction() {
+        List<Transaction> all = transactionRepository.findAll();
+        List<TransactionDto> transactionDtos = new ArrayList<>();
+        for (Transaction transaction : all) {
+            TransactionDto transactionDto = transactionMapper.toDto(transaction);
+            transactionDto.setUserId(transaction.getUser().getId());
+            transactionDtos.add(transactionDto);
+        }
 
-
-        return transactionMapper.toDto(transactionRepository.findAll());
+        return transactionDtos;
     }
 
     @Override
@@ -67,8 +74,6 @@ public class TransactionServiceImpl implements TransactionService {
         Transaction transaction = transactionMapper.toTransaction(transactionRequest);
         transaction.setTransactionDate(LocalDate.now());
         transaction.setUser(userRepository.findById(userId).orElseThrow(() -> new NotFoundException("User not found")));
-
-
 
 
         return transactionMapper.toDto(transactionRepository.save(transaction));

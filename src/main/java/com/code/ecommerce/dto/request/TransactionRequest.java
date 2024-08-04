@@ -10,6 +10,5 @@ public class TransactionRequest {
     private Long nftId;
     private Integer quantity;
     private BigDecimal price;
-    private LocalDate transactionDate;
     private String walletAddress;
 }

@@ -41,7 +41,7 @@ public class SummaryServiceImpl implements SummaryService {
 
         List<VolumeDay> volumeDays = new ArrayList<>();
 
-        for (int i = 7; i >= 1; i--) {
+        for (int i = 6; i >= 0; i--) {
             LocalDate date = today.minusDays(i);
             String dayOfWeek = date.format(dayOfWeekFormatter);
 
