@@ -45,6 +45,16 @@ public class UserController {
 
   }
 
+  @GetMapping("/wallet-address/{walletAddress}")
+  @PreAuthorize("hasAnyAuthority('USER','ADMIN')")
+  public ResponseEntity<ResponseMessage> getByWalletAddress(@PathVariable String walletAddress) {
+    return ResponseEntity
+        .status(HttpStatus.OK)
+        .body(ResponseMessage.<UserDto>builder().code(200).message("Get user successful !!!")
+            .data(userService.getByWalletAddress(walletAddress)).build());
+
+  }
+
   @PutMapping("/{id}")
   @PreAuthorize("hasAnyAuthority('USER','ADMIN')")
   public ResponseEntity<ResponseMessage> updateUserInfo(@RequestBody Map<String, Object> fields,

@@ -160,5 +160,11 @@ public class UserServiceImpl implements UserService {
     return id;
   }
 
+  @Override
+  public UserDto getByWalletAddress(String walletAddress) {
+    User userFound = userRepository.findByWalletAddress(walletAddress);
+    return userMapper.toDto(userFound);
+  }
+
 
 }

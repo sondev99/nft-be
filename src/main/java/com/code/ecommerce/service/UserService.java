@@ -28,4 +28,6 @@ public interface UserService {
 
 
   String blockUser(String id);
+
+  UserDto getByWalletAddress(String walletAddress);
 }

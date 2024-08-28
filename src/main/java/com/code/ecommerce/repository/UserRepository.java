@@ -23,4 +23,7 @@ public interface UserRepository extends JpaRepository<User, String> {
 
     @Query("SELECT COUNT(t) FROM User t WHERE t.createdAt BETWEEN :startDate AND :endDate")
     long countUser(@Param("startDate") LocalDateTime startDate, @Param("endDate") LocalDateTime endDate);
+
+    @Query("SELECT t FROM User t WHERE t.walletAddress = :walletAddress")
+    User findByWalletAddress(String walletAddress);
 }
