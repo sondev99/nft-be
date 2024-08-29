@@ -10,4 +10,6 @@ public interface SummaryService {
     SummaryResponse getSummary(LocalDateTime startDate, LocalDateTime endDate);
 
     List<VolumeDay> getTradingVolume7Day();
+
+  List<VolumeDay> getChartPrice(Long nftId);
 }

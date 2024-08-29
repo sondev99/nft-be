@@ -56,5 +56,26 @@ public class SummaryServiceImpl implements SummaryService {
 
         return volumeDays;
     }
+
+    @Override
+    public List<VolumeDay> getChartPrice(Long nftId) {
+        LocalDate today = LocalDate.now();
+        DateTimeFormatter dayOfWeekFormatter = DateTimeFormatter.ofPattern("EEEE");
+
+
+        List<VolumeDay> volumeDays = new ArrayList<>();
+        for (int i = 4; i >= 0; i--) {
+            LocalDate date = today.minusDays(i);
+            String dayOfWeek = date.format(dayOfWeekFormatter);
+            volumeDays.add(
+                VolumeDay.builder()
+                    .volume(transactionService.getChartByDay(date, nftId))
+                    .dayOfWeek(dayOfWeek)
+                    .build()
+            );
+
+        }
+        return volumeDays;
+    }
 //    private final
 }

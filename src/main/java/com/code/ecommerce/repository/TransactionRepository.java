@@ -27,4 +27,6 @@ public interface TransactionRepository extends JpaRepository<Transaction, String
     long countTransactionsBetweenDates(@Param("startDate") LocalDateTime startDate, @Param("endDate") LocalDateTime endDate);
 
     List<Transaction> findTransactionByTransactionDate(LocalDate transactionDate);
+
+    List<Transaction> findTransactionByTransactionDateAndNftId(LocalDate date, Long nftId);
 }
